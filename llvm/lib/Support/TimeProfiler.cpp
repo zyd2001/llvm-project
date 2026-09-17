@@ -179,7 +179,7 @@ struct llvm::TimeTraceProfiler {
     // Calculate duration at full precision for overall counts.
     DurationType Duration = E.End - E.Start;
 
-    const auto *Iter =
+    auto *Iter =
         llvm::find_if(Stack, [&](const std::unique_ptr<InProgressEntry> &Val) {
           return &Val->Event == &E;
         });
@@ -195,10 +195,9 @@ struct llvm::TimeTraceProfiler {
 
     // Track total time taken by each "name", but only the topmost levels of
     // them; e.g. if there's a template instantiation that instantiates other
-    // templates from within, we only want to add the topmost one. "topmost"
-    // happens to be the ones that don't have any currently open entries above
-    // itself.
-    if (llvm::none_of(llvm::drop_begin(llvm::reverse(Stack)),
+    // templates from within, we only want to add the topmost one. Only consider
+    // earlier entries: async events started within this entry may still be open.
+    if (llvm::none_of(llvm::make_range(Stack.begin(), Iter),
                       [&](const std::unique_ptr<InProgressEntry> &Val) {
                         return Val->Event.Name == E.Name;
                       })) {
